@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+	</head>
+	<style>
+		#canvas {
+			background: pink;
+			cursor: default;
+		}
+		
+		#keyword-box {
+			margin: 10px 0;
+		}
+		
+		#showing {
+			background: lightblue;
+		}
+		
+		#answer-box {
+			margin: 10px 0;
+		}
+	</style>
+
+	<body>
+		<div id="demo">
+			<select v-model="isShow">
+				<option value="1">画图</option>
+				<option value="2">猜图</option>
+			</select>
+			<!--画图-->
+			<div v-show="isShow==1">
+				<canvas id="canvas" width="520" height="350" style="border: 1px solid #999;"></canvas>
+				<div id="keyword-box">
+					<span>Keyword: </span>
+					<span id="keyword"></span>
+				</div>
+				<button id="btn">清空画布</button>
+				<input id="ask" type="text" />
+				<button id="send">发送</button>
+			</div>
+			<!--猜图-->
+			<div v-show="isShow==2">
+				<canvas id="showing" width="520" height="350" style="border: 1px solid #999;"></canvas>
+				<div id="answer-box">
+					<span>Answer: </span>
+					<input id="answer" type="text">
+					<button id="submit">提交</button>
+				</div>
+			</div>
+		</div>
+	</body>
+	<script src="js/vue.js"></script>
+	<script src="js/socket.js"></script>
+	<script>
+		//画图
+		class Draw {
+			constructor(el) {
+				this.canvas = document.getElementById(el)
+				this.cxt = this.canvas.getContext('2d')
+				this.stage_info = canvas.getBoundingClientRect()
+				this.path = {
+					beginX: 0,
+					beginY: 0,
+					endX: 0,
+					endY: 0
+				}
+			}
+
+			init(socket, btn, send) {
+				this.canvas.onmousedown = () => {
+					this.drawBegin(event, socket)
+				}
+				this.canvas.onmouseup = () => {
+					this.drawEnd()
+					socket.emit("stop", "stop");
+				}
+				this.clearCanvas(btn, socket);
+				this.sendText(send, socket);
+				this.answerText(socket);
+			}
+			drawBegin(e, socket) {
+				this.cxt.strokeStyle = "#000"
+
+				this.cxt.beginPath()
+				this.cxt.moveTo(
+					e.clientX - this.stage_info.left,
+					e.clientY - this.stage_info.top
+				)
+
+				this.path.beginX = e.clientX - this.stage_info.left
+				this.path.beginY = e.clientY - this.stage_info.top
+
+				document.onmousemove = () => {
+					this.drawing(event, socket)
+				}
+			}
+			drawing(e, socket) {
+				this.cxt.lineTo(
+					e.clientX - this.stage_info.left,
+					e.clientY - this.stage_info.top
+				)
+
+				this.path.endX = e.clientX - this.stage_info.left
+				this.path.endY = e.clientY - this.stage_info.top
+
+				socket.emit('draw', {
+					beginX: this.path.beginX,
+					beginY: this.path.beginY,
+					endX: this.path.endX,
+					endY: this.path.endY
+				});
+				this.cxt.stroke()
+			}
+			drawEnd() {
+				document.onmousemove = document.onmouseup = null
+			}
+			clearCanvas(btn, socket) {
+				btn.onclick = () => {
+					this.cxt.clearRect(0, 0, 500, 500);
+					socket.emit("clear", "clear")
+				}
+			}
+			sendText(send, socket) {
+				send.onclick = () => {
+					socket.emit("ask", document.getElementById("ask").value)
+				}
+			}
+			answerText(socket) {
+				socket.on('answer', function(data) {
+					console.log(data)
+					if(data=='right'){
+						alert("正确")
+					}else{
+						alert("错误")
+					}
+				})
+			}
+		}
+
+		//猜图
+		class Paint {
+			constructor(el) {
+				this.el = el
+				this.canvas = document.getElementById(this.el)
+				this.cxt = this.canvas.getContext('2d')
+				this.moveToSwitch = 1;
+			}
+			init(socket, submit, answer) {
+				var self = this;
+				socket.on('paint', function(data) {
+					console.log(data)
+						//如果是一直画的情况走这个分支，不让它每次都从起点画
+					if(self.moveToSwitch) {
+						self.cxt.beginPath()
+						self.cxt.moveTo(data.beginX, data.beginY)
+						self.moveToSwitch = 0
+					} else if(!self.moveToSwitch && data == 'stop') {
+						self.cxt.beginPath()
+						self.cxt.moveTo(data.beginX, data.beginY)
+						self.moveToSwitch = 1
+					}
+					self.cxt.lineTo(data.endX, data.endY)
+					self.cxt.stroke()
+				});
+				socket.on('clear', function(data) {
+					console.log(data)
+					if(self.moveToSwitch && data == 'clear') {
+						self.cxt.clearRect(0, 0, 500, 500)
+					}
+				});
+				this.sendText(socket, submit, answer);
+			}
+			sendText(socket, submit, answer) {
+				submit.onclick = () => {
+					socket.emit("answer", document.getElementById("answer").value)
+				}
+			}
+		}
+		new Vue({
+			el: '#demo',
+			data: {
+				name: 'wscats',
+				text: '',
+				isShow: 1,
+			},
+			method: {
+
+			},
+			mounted: function() {
+				//画图
+				var draw = new Draw('canvas');
+				var socket = io('http://localhost');
+				var btn = document.getElementById('btn');
+				var send = document.getElementById('send');
+				draw.init(socket, btn, send);
+
+				//猜图
+				var paint = new Paint('showing');
+				var submit = document.getElementById('submit')
+				var answer = document.getElementById('answer');
+				paint.init(socket, submit, answer);
+			}
+		})
+	</script>
+
+</html>
