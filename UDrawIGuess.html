@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+	</head>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
+		
+		#canvas {
+			background: pink;
+			cursor: default;
+		}
+		
+		#keyword-box {
+			margin: 10px 0;
+		}
+		
+		#showing {
+			background: lightblue;
+		}
+		
+		#answer-box {
+			margin: 10px 0;
+		}
+	</style>
+	<body>
+		<div id="demo">
+			<!--画图-->
+			<div>
+				<canvas id="canvas" width="520" height="350" style="border: 1px solid #999;"></canvas>
+				<div id="keyword-box">
+					<span>Keyword: </span>
+					<span id="keyword"></span>
+				</div>
+				<button id="btn">清空画布</button>
+				<input id="ask" type="text" />
+				<button id="send">发送</button>
+			</div>
+			<!--猜图-->
+			<div>
+				<canvas id="showing" width="520" height="350" style="border: 1px solid #999;"></canvas>
+				<div id="answer-box">
+					<span>Answer: </span>
+					<input id="answer" type="text">
+					<button id="submit">提交</button>
+				</div>
+			</div>
+		</div>
+	</body>
+	<script src="js/socket.js"></script>
+	<script>
+		//画图
+		var socket = io('http://localhost');
+		var btn = document.getElementById('btn');
+		var send = document.getElementById('send');
+		var canvas = document.getElementById('canvas');
+		var cxt = canvas.getContext('2d');
+		var path = {
+			beginX: 0,
+			beginY: 0,
+			endX: 0,
+			endY: 0
+		}
+		canvas.onmousedown = function(e) {
+			cxt.strokeStyle = "#000"
+			cxt.beginPath()
+			cxt.moveTo(
+				e.clientX,
+				e.clientY
+			)
+
+			path.beginX = e.clientX;
+			path.beginY = e.clientY;
+			document.onmousemove = function(e) {
+				cxt.lineTo(
+					e.clientX,
+					e.clientY
+				)
+
+				path.endX = e.clientX;
+				path.endY = e.clientY;
+
+				socket.emit('draw', {
+					beginX: path.beginX,
+					beginY: path.beginY,
+					endX: path.endX,
+					endY: path.endY
+				});
+				cxt.stroke()
+			}
+		}
+		canvas.onmouseup = () => {
+			document.onmousemove = document.onmouseup = null
+			socket.emit("stop", "stop");
+		}
+		btn.onclick = function() {
+			cxt.clearRect(0, 0, 500, 500);
+			socket.emit("clear", "clear")
+		}
+		send.onclick = () => {
+			socket.emit("ask", document.getElementById("ask").value)
+		}
+		socket.on('answer', function(data) {
+			console.log(data)
+			if(data == 'right') {
+				alert("正确")
+			} else {
+				alert("错误")
+			}
+		})
+
+		//猜图
+		//var paint = new Paint('showing');
+		var submit = document.getElementById('submit')
+		var answer = document.getElementById('answer');
+		var canvas2 = document.getElementById('showing')
+		var cxt2 = canvas2.getContext('2d')
+		var moveToSwitch = 1;
+
+		socket.on('paint', function(data) {
+			//如果是一直画的情况走这个分支，不让它每次都从起点画
+			if(moveToSwitch) {
+				cxt2.beginPath()
+				cxt2.moveTo(data.beginX, data.beginY)
+				moveToSwitch = 0
+			} else if(!moveToSwitch && data == 'stop') {
+				cxt2.beginPath()
+				cxt2.moveTo(data.beginX, data.beginY)
+				moveToSwitch = 1
+			}
+			cxt2.lineTo(data.endX, data.endY)
+			cxt2.stroke()
+		});
+		socket.on('clear', function(data) {
+			console.log(data)
+			if(moveToSwitch && data == 'clear') {
+				cxt2.clearRect(0, 0, 500, 500)
+			}
+		});
+		submit.onclick = () => {
+			socket.emit("answer", document.getElementById("answer").value)
+		}
+	</script>
+</html>

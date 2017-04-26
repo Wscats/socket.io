@@ -54,4 +54,5 @@ io.on('connection', function(socket) {
 			io.emit('answer', 'wrong');
 		}
 	});
+	console.log(io.sockets.sockets);
 });
