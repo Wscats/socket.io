@@ -1,12 +1,14 @@
-var app = require('http').createServer(function(req, res) {
+'use strict';
+
+const app = require('http').createServer(function(req, res) {
 	
 })
-var io = require('socket.io')(app);
-var fs = require('fs');
+const io = require('socket.io')(app);
+const fs = require('fs');
 
 app.listen(8899);
 console.log("开启socket.io")
-var users = {};
+const users = {};
 //简历socket连接
 io.on('connection', function(socket) {
 	console.log(socket.id)

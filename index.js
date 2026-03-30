@@ -1,6 +1,8 @@
-var app = require('http').createServer(handler)
-var io = require('socket.io')(app);
-var fs = require('fs');
+'use strict';
+
+const app = require('http').createServer(handler)
+const io = require('socket.io')(app);
+const fs = require('fs');
 
 app.listen(80);
 console.log("开启socket.io")
@@ -48,7 +50,7 @@ io.on('connection', function(socket) {
 	//猜图回答
 	socket.on('answer', function(data) {
 		console.log('answer:' + data);
-		if(text == data) {
+		if(text === data) {
 			io.emit('answer', 'right');
 		}else{
 			io.emit('answer', 'wrong');
